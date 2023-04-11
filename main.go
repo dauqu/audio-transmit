@@ -7,7 +7,11 @@ import (
 	"sync"
 )
 
-var upgrader = websocket.Upgrader{} // WebSocket upgrader
+var upgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool {
+		return true
+	},
+} // WebSocket upgrader
 
 type Room struct {
 	ID           string
