@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>WebSocket Chat</title>
+</head>
+<body>
+  <input type="text" id="roomInput" placeholder="Enter room ID">
+  <input type="text" id="messageInput" placeholder="Enter message">
+  <button onclick="joinRoom()">Join Room</button>
+  <button onclick="sendMessage()">Send Message</button>
+  <ul id="chatLog"></ul>
+
+  <script>
+    var socket;
+
+    function joinRoom() {
+      var roomID = document.getElementById("roomInput").value;
+      if (!roomID) {
+        alert("Please enter a room ID");
+        return;
+      }
+
+      socket = new WebSocket("ws://" + window.location.host + "/ws");
+      socket.onopen = function(event) {
+        console.log("WebSocket connection opened:", event);
+
+        // Send a join room message to the server
+        var message = {
+          type: "join",
+          room: roomID
+        };
+        socket.send(JSON.stringify(message));
+      };
+
+      socket.onmessage = function(event) {
+        console.log("WebSocket message received:", event);
+
+        // Add the received message to the chat log
+        var chatLog = document.getElementById("chatLog");
+        var li = document.createElement("li");
+        li.textContent = event.data;
+        chatLog.appendChild(li);
+      };
+
+      socket.onclose = function(event) {
+        console.log("WebSocket connection closed:", event);
+      };
+    }
+
+    function sendMessage() {
+      var message = document.getElementById("messageInput").value;
+      if (!message) {
+        alert("Please enter a message");
+        return;
+      }
+
+      // Send a message to the server
+      var chatLog = document.getElementById("chatLog");
+      var li = document.createElement("li");
+      li.textContent = "You: " + message;
+      chatLog.appendChild(li);
+
+      socket.send(JSON.stringify({
+        type: "message",
+        room: document.getElementById("roomInput").value,
+        message: message
+      }));
+
+      // Clear the input field
+      document.getElementById("messageInput").value = "";
+    }
+  </script>
+</body>
+</html>

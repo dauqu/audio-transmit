@@ -1,0 +1,93 @@
+package main
+
+import (
+	"log"
+	"net/http"
+
+	"github.com/gorilla/websocket"
+	"github.com/gin-gonic/gin"
+)
+
+var upgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool {
+		return true
+	},
+}
+
+var clients = make(map[string]*websocket.Conn) // connected clients with their IDs
+var broadcast = make(chan []byte)             // channel for broadcasting messages
+
+func handleWebSocket(c *gin.Context) {
+	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
+	if err != nil {
+		log.Println("Failed to upgrade connection to WebSocket:", err)
+		return
+	}
+
+	// Get the ID from the URL
+	id := c.Param("id")
+
+	// Validate the ID
+	if id == "" {
+		log.Println("Invalid ID")
+		return
+	}
+
+	// Send message to the client with the ID
+	err = conn.WriteMessage(websocket.TextMessage, []byte(id))
+	if err != nil {
+		log.Println("Failed to write message to client:", err)
+	}
+
+	// Register new client with its ID
+	clients[id] = conn
+
+	for {
+		// Read message from client
+		_, msg, err := conn.ReadMessage()
+		if err != nil {
+			log.Println("Failed to read message from client:", err)
+			conn.Close()
+			delete(clients, id)
+			break
+		}
+
+		// Send message to broadcast channel
+		broadcast <- msg
+	}
+}
+
+func broadcastMessages() {
+	for {
+		// Get message from broadcast channel
+		msg := <-broadcast
+
+		// Extract the ID from the message
+		id := string(msg)
+
+		// Send message to client with the specified ID
+		client, ok := clients[id]
+		if ok {
+			err := client.WriteMessage(websocket.TextMessage, msg)
+			if err != nil {
+				log.Println("Failed to write message to client:", err)
+				client.Close()
+				delete(clients, id)
+			}
+		}
+	}
+}
+
+func main() {
+	// Start broadcasting messages
+	go broadcastMessages()
+
+	// Create router
+	router := gin.Default()
+
+	// Create route for WebSocket
+	router.GET("/ws/:id", handleWebSocket)
+
+	// Start server
+	router.Run(":8000")
+}
