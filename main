@@ -4,18 +4,30 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/gorilla/websocket"
 	"github.com/gin-gonic/gin"
+	"github.com/gorilla/websocket"
 )
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
-		return true
+		// Get the Origin header from the request
+		origin := r.Header.Get("Origin")
+
+		// Check if the origin is allowed
+		allowedOrigins := []string{"https://www.piesocket.com"} // List of allowed origins
+		for _, allowedOrigin := range allowedOrigins {
+			if origin == allowedOrigin {
+				return true
+			}
+		}
+
+		// If the origin is not allowed, return false
+		return false
 	},
 }
 
 var clients = make(map[string]*websocket.Conn) // connected clients with their IDs
-var broadcast = make(chan []byte)             // channel for broadcasting messages
+var broadcast = make(chan []byte)              // channel for broadcasting messages
 
 func handleWebSocket(c *gin.Context) {
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
